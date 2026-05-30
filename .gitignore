@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+.opencode/
+build/
+dist/
+installateur/
+*.exe
+*.zip
+*.tar.gz
+*.log
+*.tmp
+data/*.db
+data/recus/
+data/rapports/
+data/fne/
+data/factures/

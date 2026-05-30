@@ -1,0 +1,102 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build executable
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm Magazin-ci.spec
+          Copy-Item README.md dist\README.md
+          Copy-Item lancer-magazin-ci.bat dist\lancer-magazin-ci.bat
+          New-Item -ItemType Directory -Force dist\data | Out-Null
+          if (Test-Path data) {
+            Copy-Item data dist\data -Recurse -Force
+          }
+          Compress-Archive -Path dist\Magazin-ci.exe, dist\README.md, dist\lancer-magazin-ci.bat, dist\data -DestinationPath Magazin-ci-windows.zip -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Magazin-ci-windows
+          path: Magazin-ci-windows.zip
+
+      - name: Upload release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Magazin-ci-windows.zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build Linux package
+        run: |
+          ARGS=(--windowed --name "Magazin-ci")
+          if [ -f "LOGO_.png" ]; then
+            ARGS+=(--add-data "LOGO_.png:.")
+          fi
+          python -m PyInstaller "${ARGS[@]}" app.py
+          cp README.md dist/Magazin-ci/README.md
+          mkdir -p dist/Magazin-ci/data
+          if [ -d data ]; then
+            cp -R data/. dist/Magazin-ci/data/
+          fi
+          cd dist
+          tar -czf Magazin-ci-linux.tar.gz Magazin-ci
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Magazin-ci-linux
+          path: dist/Magazin-ci-linux.tar.gz
+
+      - name: Upload release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Magazin-ci-linux.tar.gz

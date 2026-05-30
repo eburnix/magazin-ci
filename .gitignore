@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .venv/
+.venv-linux/
 .opencode/
 build/
 dist/
@@ -15,3 +16,7 @@ data/recus/
 data/rapports/
 data/fne/
 data/factures/
+data/etiquettes/
+data/devis/
+data/livraisons/
+data/uploads/

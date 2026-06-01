@@ -9,7 +9,7 @@ import sqlite3
 import subprocess
 import sys
 import time
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
@@ -26,8 +26,10 @@ except ImportError:
     ImageTk = None
 
 APP_NAME = "Magazin-ci"
-APP_VERSION = "1.1.1"
+APP_VERSION = "1.1.2"
 INSTALL_PIN = "05535350"
+RENEWAL_PIN = "0707687068"
+LICENSE_DAYS = 365
 ACCESS_PIN = "0714"
 DEVELOPER_CREDIT = "Developpe par Datadev-ci Tel : +225 0714351471 Abidjan - datadev.wps@gmail.com"
 
@@ -398,21 +400,6 @@ class Database:
                 """,
                 (name, role, pin_hash(pin), now),
             )
-        count = self.conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
-        if count == 0:
-            products = [
-                ("Riz 5kg", "Alimentation", "", "sac", 2800, 3500, 20, 5),
-                ("Huile 1L", "Alimentation", "", "bouteille", 950, 1200, 30, 8),
-                ("Savon", "Menage", "", "piece", 250, 400, 50, 10),
-                ("Credit mobile", "Service", "", "operation", 0, 1000, 0, 0),
-            ]
-            self.conn.executemany(
-                """
-                INSERT INTO products(name, category, barcode, unit, purchase_price, sale_price, stock, alert_stock, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [(*p, now) for p in products],
-            )
         self.conn.commit()
 
     def all(self, query, params=()):
@@ -535,7 +522,7 @@ class MagazinApp(tk.Tk):
 
     def ensure_installation_activated(self):
         if self.setting("installation_activated") == "1":
-            return True
+            return self.ensure_license_valid()
         title = f"Installation {APP_NAME}"
         for attempt in range(3):
             pin = simpledialog.askstring(
@@ -547,14 +534,23 @@ class MagazinApp(tk.Tk):
             if pin is None:
                 return False
             if pin == INSTALL_PIN:
+                now = datetime.now()
+                expires_at = now + timedelta(days=LICENSE_DAYS)
                 self.db.execute(
                     "INSERT OR REPLACE INTO settings(key, value) VALUES ('installation_activated', '1')"
                 )
                 self.db.execute(
                     "INSERT OR REPLACE INTO settings(key, value) VALUES ('installation_activated_at', ?)",
-                    (datetime.now().isoformat(timespec="seconds"),),
+                    (now.isoformat(timespec="seconds"),),
                 )
-                messagebox.showinfo(title, "Installation activee avec succes.")
+                self.db.execute(
+                    "INSERT OR REPLACE INTO settings(key, value) VALUES ('license_expires_at', ?)",
+                    (expires_at.isoformat(timespec="seconds"),),
+                )
+                messagebox.showinfo(
+                    title,
+                    f"Installation activee avec succes.\nLicence valable jusqu'au {expires_at.strftime('%d/%m/%Y')}.",
+                )
                 return True
             remaining = 2 - attempt
             messagebox.showerror(title, f"PIN d'installation incorrect. Tentatives restantes: {remaining}")
@@ -565,6 +561,53 @@ class MagazinApp(tk.Tk):
                 self.iconphoto(True, self.logo_image)
             except Exception:
                 pass
+
+    def ensure_license_valid(self):
+        raw_expiry = self.setting("license_expires_at")
+        now = datetime.now()
+        if not raw_expiry:
+            expires_at = now + timedelta(days=LICENSE_DAYS)
+            self.db.execute(
+                "INSERT OR REPLACE INTO settings(key, value) VALUES ('license_expires_at', ?)",
+                (expires_at.isoformat(timespec="seconds"),),
+            )
+            return True
+        try:
+            expires_at = datetime.fromisoformat(raw_expiry)
+        except ValueError:
+            expires_at = now - timedelta(seconds=1)
+        if now < expires_at:
+            return True
+
+        title = f"Licence {APP_NAME}"
+        for attempt in range(3):
+            pin = simpledialog.askstring(
+                title,
+                "Licence expiree.\nEntrez le PIN de reactivation pour prolonger 12 mois:",
+                show="*",
+                parent=self,
+            )
+            if pin is None:
+                return False
+            if pin == RENEWAL_PIN:
+                new_expiry = now + timedelta(days=LICENSE_DAYS)
+                self.db.execute(
+                    "INSERT OR REPLACE INTO settings(key, value) VALUES ('license_expires_at', ?)",
+                    (new_expiry.isoformat(timespec="seconds"),),
+                )
+                self.db.execute(
+                    "INSERT OR REPLACE INTO settings(key, value) VALUES ('license_renewed_at', ?)",
+                    (now.isoformat(timespec="seconds"),),
+                )
+                messagebox.showinfo(
+                    title,
+                    f"Licence reactivee avec succes.\nNouvelle validite jusqu'au {new_expiry.strftime('%d/%m/%Y')}.",
+                )
+                return True
+            remaining = 2 - attempt
+            messagebox.showerror(title, f"PIN de reactivation incorrect. Tentatives restantes: {remaining}")
+        messagebox.showerror(title, "Licence expiree. Fermeture de l'application.")
+        return False
 
     def prompt_access_pin(self):
         result = {"ok": False, "attempts": 0}

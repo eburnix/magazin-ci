@@ -92,13 +92,21 @@ Le module `Retours` permet de traiter un retour client:
 
 ## Lancement
 
-Installer Python 3 sur Windows, puis double-cliquer sur:
+Sur Windows, utiliser l'installateur classique publie en release:
+
+`Magazin-ci-Setup.exe`
+
+En mode developpement, installer Python 3 sur Windows, puis double-cliquer sur:
 
 `lancer-magazin-ci.bat`
 
 Les donnees sont stockees dans:
 
 `data/magazin_ci.db`
+
+Les builds GitHub ne publient pas le dossier `data`: aucune vente, facture, recu, image importee, base SQLite locale ou autre donnee metier n'est incluse dans les fichiers de release.
+
+Les releases automatiques generent Windows, Linux et macOS. Android et Web ne sont pas generes par ce projet Python/Tkinter sans portage vers une base mobile/web dediee.
 
 ## Facturation et FNE
 
@@ -164,8 +172,10 @@ Les codes d'acces ne sont pas affiches sur la page de connexion.
 Au premier lancement sur un poste Windows/EXE, l'application demande un PIN d'installation pour activer localement le logiciel:
 
 - PIN d'installation: `05535350`
+- Validite initiale: 12 mois
+- PIN de reactivation annuelle: `0707687068`
 
-Une fois l'installation activee, ce PIN n'est plus redemande sur le meme poste sauf remise a zero de la base locale.
+Une fois l'installation activee, le PIN d'installation n'est plus redemande sur le meme poste sauf remise a zero de la base locale. A expiration, seul le PIN de reactivation prolonge la licence de 12 mois.
 
 Comptes par defaut:
 
